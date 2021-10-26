@@ -52,9 +52,9 @@ namespace ns3
       else
         {
           info.SetHops (hops);
-          info.SetPosition (std::make_pair<double,double>(xPos, yPos));
+          info.SetPosition (std::make_pair<double,double>(std::move(xPos), std::move(yPos)));
           info.SetTime (Simulator::Now ());
-          m_table.insert (std::make_pair<Ipv4Address, BeaconInfo>(beacon, info));
+          m_table.insert (std::make_pair<Ipv4Address, BeaconInfo>(std::move(beacon), std::move(info)));
         }
     }
 
