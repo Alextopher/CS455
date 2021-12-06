@@ -16,10 +16,7 @@ using namespace ns3;
 /**
  * \brief Test script.
  *
- * This script creates 1-dimensional grid topology and then ping last node from the first one:
- *
- * [10.0.0.1] <-- step --> [10.0.0.2] <-- step --> [10.0.0.3] <-- step --> [10.0.0.4]
- *
+ * This script creates a random 2-dimensional grid topology
  *
  */
 class DVHopExample
@@ -38,8 +35,6 @@ private:
   //\{
   /// Number of nodes
   uint32_t size;
-  /// Distance between nodes, meters
-  double step;
   /// Simulation time, seconds
   double totalTime;
   /// Write per-device PCAP traces if true
@@ -76,8 +71,7 @@ int main (int argc, char **argv)
 
 //-----------------------------------------------------------------------------
 DVHopExample::DVHopExample () :
-  size (10),
-  step (100),
+  size (20),
   totalTime (10),
   pcap (true),
   printRoutes (true)
@@ -97,7 +91,6 @@ DVHopExample::Configure (int argc, char **argv)
   cmd.AddValue ("printRoutes", "Print routing table dumps.", printRoutes);
   cmd.AddValue ("size", "Number of nodes.", size);
   cmd.AddValue ("time", "Simulation time, s.", totalTime);
-  cmd.AddValue ("step", "Grid step, m", step);
 
   cmd.Parse (argc, argv);
   return true;
@@ -131,7 +124,7 @@ DVHopExample::Report (std::ostream &)
 void
 DVHopExample::CreateNodes ()
 {
-  std::cout << "Creating " << (unsigned)size << " nodes " << step << " m apart.\n";
+  std::cout << "Creating " << (unsigned)size << " nodes\n";
   nodes.Create (size);
   // Name nodes
   for (uint32_t i = 0; i < size; ++i)
@@ -141,39 +134,49 @@ DVHopExample::CreateNodes ()
       std::cout << "Creating node: "<< os.str ()<< std::endl ;
       Names::Add (os.str (), nodes.Get (i));
     }
-  // Create static grid
+  
+  // x,y values
+  Ptr<UniformRandomVariable> xs = CreateObject<UniformRandomVariable> ();
+  xs->SetAttribute ("Max", DoubleValue (100));
+  Ptr<UniformRandomVariable> ys = CreateObject<UniformRandomVariable> ();
+  ys->SetAttribute ("Max", DoubleValue (100));
+  
+  Ptr<ns3::RandomRectanglePositionAllocator> allocator = CreateObject<ns3::RandomRectanglePositionAllocator> ();
+  allocator -> SetX(xs);
+  allocator -> SetY(ys);
+
+  // Setup in a random grid
   MobilityHelper mobility;
-  mobility.SetPositionAllocator ("ns3::GridPositionAllocator",
-                                 "MinX", DoubleValue (0.0),
-                                 "MinY", DoubleValue (0.0),
-                                 "DeltaX", DoubleValue (step),
-                                 "DeltaY", DoubleValue (0),
-                                 "GridWidth", UintegerValue (size),
-                                 "LayoutType", StringValue ("RowFirst"));
-  mobility.SetMobilityModel ("ns3::ConstantPositionMobilityModel");
+  mobility.SetPositionAllocator(allocator);
+  mobility.SetMobilityModel ("ns3::ConstantPositionMobilityModel", "");
   mobility.Install (nodes);
 }
 
 void
 DVHopExample::CreateBeacons ()
 {
-  Ptr<Ipv4RoutingProtocol> proto = nodes.Get (0)->GetObject<Ipv4>()->GetRoutingProtocol ();
-  Ptr<dvhop::RoutingProtocol> dvhop = DynamicCast<dvhop::RoutingProtocol> (proto);
-  dvhop->SetIsBeacon (true);
-  dvhop->SetPosition (123.42, 4534.452);
+  // Promote the first 4 nodes to beacons
+  for (int i = 0; i < 4; i++) {
+    ns3::Ptr<ns3::Node> node = nodes.Get(i);
+    Vector position = node -> GetObject<MobilityModel> () -> GetPosition();
 
+    Ptr<Ipv4RoutingProtocol> proto = node -> GetObject<Ipv4>() -> GetRoutingProtocol ();
+    Ptr<dvhop::RoutingProtocol> dvhop = DynamicCast<dvhop::RoutingProtocol> (proto);
+    dvhop->SetIsBeacon (true);
+    dvhop->SetPosition (position.x, position.y);
+  }
 
-  proto = nodes.Get (4)->GetObject<Ipv4>()->GetRoutingProtocol ();
-  dvhop = DynamicCast<dvhop::RoutingProtocol> (proto);
-  dvhop->SetIsBeacon (true);
-  dvhop->SetPosition (6663.42, 566.646);
+  // // Increase the position of all nodes 10x
+  //   for (int i = 0; i < 4; i++) {
+  //   ns3::Ptr<ns3::Node> node = nodes.Get(i);
+  //   Vector position = node -> GetObject<MobilityModel> () -> GetPosition();
+  //   Vector newposition = Vector(position.x * 20, position.y * 20, position.z);
+  //   node -> GetObject<MobilityModel> () -> SetPosition(newposition);
 
-
-  proto = nodes.Get (9)->GetObject<Ipv4>()->GetRoutingProtocol ();
-  dvhop = DynamicCast<dvhop::RoutingProtocol> (proto);
-  dvhop->SetIsBeacon (true);
-  dvhop->SetPosition (123.42, 9873.45);
-
+  //   Ptr<Ipv4RoutingProtocol> proto = node -> GetObject<Ipv4>() -> GetRoutingProtocol ();
+  //   Ptr<dvhop::RoutingProtocol> dvhop = DynamicCast<dvhop::RoutingProtocol> (proto);
+  //   dvhop->SetPosition (newposition.x, newposition.y);
+  // }
 }
 
 
