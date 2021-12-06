@@ -117,16 +117,16 @@ DVHopExample::Run ()
 
   AnimationInterface anim("animation.xml");
 
-  Simulator::Schedule (Seconds(5), DVHopExample::Kill);
-  Simulator::Schedule (Seconds(10), DVHopExample::Kill);
-  Simulator::Schedule (Seconds(15), DVHopExample::Kill);
-  Simulator::Schedule (Seconds(20), DVHopExample::Kill);
-  Simulator::Schedule (Seconds(25), DVHopExample::Kill);
-  Simulator::Schedule (Seconds(30), DVHopExample::Kill);
-  Simulator::Schedule (Seconds(35), DVHopExample::Kill);
-  Simulator::Schedule (Seconds(40), DVHopExample::Kill);
-  Simulator::Schedule (Seconds(45), DVHopExample::Kill);
-  Simulator::Schedule (Seconds(50), DVHopExample::Kill);
+  Simulator::Schedule (Seconds(5), &DVHopExample::Kill);
+  Simulator::Schedule (Seconds(10), &DVHopExample::Kill);
+  Simulator::Schedule (Seconds(15), &DVHopExample::Kill);
+  Simulator::Schedule (Seconds(20), &DVHopExample::Kill);
+  Simulator::Schedule (Seconds(25), &DVHopExample::Kill);
+  Simulator::Schedule (Seconds(30), &DVHopExample::Kill);
+  Simulator::Schedule (Seconds(35), &DVHopExample::Kill);
+  Simulator::Schedule (Seconds(40), &DVHopExample::Kill);
+  Simulator::Schedule (Seconds(45), &DVHopExample::Kill);
+  Simulator::Schedule (Seconds(50), &DVHopExample::Kill);
 
   Simulator::Run ();
   DV();
