@@ -54,7 +54,8 @@ namespace ns3 {
       m_isBeacon(false),
       m_xPosition(12.56),
       m_yPosition(468.5),
-      m_seqNo (0)
+      m_seqNo (0),
+      m_isDead (0)
     {
     }
 
@@ -62,6 +63,12 @@ namespace ns3 {
 
     RoutingProtocol::~RoutingProtocol ()
     {
+    }
+
+    void
+    RoutingProtocol::Kill() {
+      m_isDead = 1;
+      m_isBeacon = 0;
     }
 
     void
@@ -84,6 +91,10 @@ namespace ns3 {
     Ptr<Ipv4Route>
     RoutingProtocol::RouteOutput (Ptr<Packet> p, const Ipv4Header &header, Ptr<NetDevice> oif, Socket::SocketErrno &sockerr)
     {
+      if (m_isDead) {
+          Ptr<Ipv4Route> route;
+          return route;
+      }
       NS_LOG_DEBUG("Outgoing packet through interface: " << (oif ? oif->GetIfIndex () : 0));
       if(!p)
         {
@@ -118,7 +129,6 @@ namespace ns3 {
       NS_LOG_DEBUG("Sending packet to: " << dst<< ", From:"<< iface.GetLocal ());
 
       //Construct a route object to return
-      //TODO: Remove hardcoded routes
       Ptr<Ipv4Route> route = Create<Ipv4Route>();
 
       route->SetDestination (dst);
@@ -136,7 +146,10 @@ namespace ns3 {
     bool
     RoutingProtocol::RouteInput (Ptr<const Packet> p, const Ipv4Header &header, Ptr<const NetDevice> idev, UnicastForwardCallback ufcb, MulticastForwardCallback mfcb, LocalDeliverCallback ldcb, ErrorCallback errcb)
     {
-      NS_LOG_FUNCTION ("Packet received: " << p->GetUid () << header.GetDestination () << idev->GetAddress ());
+      if (m_isDead) {
+         return false;
+      }
+      NS_LOG_DEBUG ("Packet received: " << p->GetUid () << header.GetDestination () << idev->GetAddress ());
 
       if(m_socketAddresses.empty ())
         {//No interface is listening
@@ -155,7 +168,7 @@ namespace ns3 {
 
       if(dst.IsMulticast ())
         {//Deal with the multicast packet
-          NS_LOG_INFO ("Multicast destination...");
+          NS_LOG_DEBUG ("Multicast destination...");
 
           //mfcb(p,header,iif);
         }
@@ -176,17 +189,17 @@ namespace ns3 {
                     }
                   else
                     {
-                      NS_LOG_ERROR("Unable to deliver packet: LocalDeliverCallback is null.");
+                      NS_LOG_DEBUG("Unable to deliver packet: LocalDeliverCallback is null.");
                       errcb(packet,header,Socket::ERROR_NOROUTETOHOST);
                     }
                   if (header.GetTtl () > 1)
                     {
-                      NS_LOG_LOGIC ("Forward broadcast...");
+                      NS_LOG_DEBUG ("Forward broadcast...");
                       //Get a route and call UnicastForwardCallback
                     }
                   else
                     {
-                      NS_LOG_LOGIC ("TTL Exceeded, drop packet");
+                      NS_LOG_DEBUG ("TTL Exceeded, drop packet");
                     }
                   return true;
                 }
@@ -541,9 +554,9 @@ namespace ns3 {
         m_disTable.AddBeacon (beacon, newHops, x, y);
     }
 
-
-
-
+    DistanceTable RoutingProtocol::GetDistanceTable() {
+      return m_disTable;
+    }
   }
 }
 

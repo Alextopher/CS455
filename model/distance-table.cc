@@ -12,6 +12,10 @@ namespace ns3
     {
     }
 
+    std::map<Ipv4Address, BeaconInfo>  DistanceTable::Inner() {
+      return m_table;
+    }
+
     uint16_t
     DistanceTable::GetHopsTo (Ipv4Address beacon) const
     {

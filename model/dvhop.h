@@ -29,6 +29,7 @@ namespace ns3 {
 
       RoutingProtocol();
       virtual ~RoutingProtocol();
+      void Kill();
       virtual void DoDispose();
 
       //From Ipv4RoutingProtocol
@@ -53,9 +54,11 @@ namespace ns3 {
 
       double GetXPosition()               { return m_xPosition;}
       double GetYPosition()               { return m_yPosition;}
+      Ptr<Ipv4> GetIpv4()                 { return m_ipv4; }
       bool  IsBeacon()                   { return m_isBeacon;}
 
       void  PrintDistances(Ptr<OutputStreamWrapper> stream, Ptr<Node> node) const;
+      DistanceTable  GetDistanceTable();
 
     private:
       //Start protocol operation
@@ -92,7 +95,8 @@ namespace ns3 {
 
       uint32_t    m_seqNo;
 
-
+      //marks if the node is dead
+      int m_isDead;
 
       //Used to simulate jitter
       Ptr<UniformRandomVariable> m_URandom;

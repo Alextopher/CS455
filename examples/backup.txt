@@ -36,7 +36,6 @@ private:
   //\{
   /// Number of nodes
   uint32_t size;
-  /// How many nodes are beacons (must be less than size)
   /// Simulation time, seconds
   double totalTime;
   /// Write per-device PCAP traces if true
@@ -58,11 +57,8 @@ private:
   void InstallInternetStack ();
   void InstallApplications ();
   void CreateBeacons();
-  void Kill();
-  void DV();
+  void KillNodes();
 };
-
-const uint32_t beacons = 20;
 
 int main (int argc, char **argv)
 {
@@ -77,8 +73,8 @@ int main (int argc, char **argv)
 
 //-----------------------------------------------------------------------------
 DVHopExample::DVHopExample () :
-  size (50),
-  totalTime (50),
+  size (20),
+  totalTime (10),
   pcap (true),
   printRoutes (false)
 {
@@ -88,7 +84,7 @@ bool
 DVHopExample::Configure (int argc, char **argv)
 {
   // Enable DVHop logs by default. Comment this if too noisy
-  LogComponentEnable("DVHopRoutingProtocol", LOG_LEVEL_ERROR);
+  LogComponentEnable("DVHopRoutingProtocol", LOG_LEVEL_ALL);
 
   SeedManager::SetSeed (12345);
   CommandLine cmd;
@@ -109,7 +105,13 @@ DVHopExample::Run ()
   CreateNodes ();
   CreateDevices ();
   InstallInternetStack ();
+
   CreateBeacons();
+
+  for (int i = 0; i < 5; i++) {
+	KillNodes();
+	InstallInternetStack();
+  }
 
   std::cout << "Starting simulation for " << totalTime << " s ...\n";
 
@@ -117,42 +119,9 @@ DVHopExample::Run ()
 
   AnimationInterface anim("animation.xml");
 
-  Simulator::Schedule (Seconds(5), DVHopExample::Kill);
-  Simulator::Schedule (Seconds(10), DVHopExample::Kill);
-  Simulator::Schedule (Seconds(15), DVHopExample::Kill);
-  Simulator::Schedule (Seconds(20), DVHopExample::Kill);
-  Simulator::Schedule (Seconds(25), DVHopExample::Kill);
-  Simulator::Schedule (Seconds(30), DVHopExample::Kill);
-  Simulator::Schedule (Seconds(35), DVHopExample::Kill);
-  Simulator::Schedule (Seconds(40), DVHopExample::Kill);
-  Simulator::Schedule (Seconds(45), DVHopExample::Kill);
-  Simulator::Schedule (Seconds(50), DVHopExample::Kill);
-
   Simulator::Run ();
-  DV();
   Simulator::Destroy ();
 }
-
-void
-DVHopExample::Kill() {
-  // pick 2 random nodes and kill them
-
-  std::random_device rd;
-  std::mt19937 rng(rd());
-  std::uniform_int_distribution<int> uni(beacons, size); // guaranteed unbiased
-
-  auto r1 = uni(rng);
-  auto r2 = uni(rng);
-
-  Ptr<Ipv4RoutingProtocol> proto = nodes.Get(r1) -> GetObject<Ipv4>() -> GetRoutingProtocol ();
-  Ptr<dvhop::RoutingProtocol> dvhop = DynamicCast<dvhop::RoutingProtocol> (proto);
-  dvhop -> Kill();
-
-  Ptr<Ipv4RoutingProtocol> proto = nodes.Get(r2) -> GetObject<Ipv4>() -> GetRoutingProtocol ();
-  Ptr<dvhop::RoutingProtocol> dvhop = DynamicCast<dvhop::RoutingProtocol> (proto);
-  dvhop -> Kill();
-}
-
 
 void
 DVHopExample::Report (std::ostream &)
@@ -175,9 +144,9 @@ DVHopExample::CreateNodes ()
   
   // x,y values
   Ptr<UniformRandomVariable> xs = CreateObject<UniformRandomVariable> ();
-  xs->SetAttribute ("Max", DoubleValue (400));
+  xs->SetAttribute ("Max", DoubleValue (100));
   Ptr<UniformRandomVariable> ys = CreateObject<UniformRandomVariable> ();
-  ys->SetAttribute ("Max", DoubleValue (400));
+  ys->SetAttribute ("Max", DoubleValue (100));
   
   Ptr<ns3::RandomRectanglePositionAllocator> allocator = CreateObject<ns3::RandomRectanglePositionAllocator> ();
   allocator -> SetX(xs);
@@ -194,7 +163,7 @@ void
 DVHopExample::CreateBeacons ()
 {
   // Promote the first 4 nodes to beacons
-  for (uint32_t i = 0; i < beacons; i++) {
+  for (int i = 0; i < 4; i++) {
     ns3::Ptr<ns3::Node> node = nodes.Get(i);
     Vector position = node -> GetObject<MobilityModel> () -> GetPosition();
 
@@ -258,80 +227,26 @@ DVHopExample::InstallInternetStack ()
     }
 }
 
-void DVHopExample::DV () {
-  // 10.0.0.1 -> 10.0.0.beacons are beacons
-  std::map<Ipv4Address, float> hopsize;
-  uint32_t i = 0;
+void
+DVHopExample::KillNodes() {
+	std::random_device rd;
+	std::mt19937 rng(rd());
+	std::uniform_int_distribution<int> uni(0, 19);
 
-  // Calculate expected size per hop
-  for (i = 0; i < beacons; i++) {
-    Ptr<Ipv4RoutingProtocol> proto = nodes.Get(i) -> GetObject<Ipv4>() -> GetRoutingProtocol ();
-    Ptr<dvhop::RoutingProtocol> dvhop = DynamicCast<dvhop::RoutingProtocol> (proto);
-    ns3::dvhop::DistanceTable table = dvhop -> GetDistanceTable();
-    std::map<Ipv4Address, ns3::dvhop::BeaconInfo> inner = table.Inner();
+	
+//	for (int i = 0; i < 5; i++) {
+		int num1 = uni(rng);
+		int num2 = uni(rng);
 
-    double x1 = dvhop -> GetXPosition();
-    double y1 = dvhop -> GetYPosition();
+		if (nodes[num1] != NULL) {
+			delete nodes[num1];
+			nodes[num1] = NULL;
+		}
 
-    int hops = 0;
-    double sum = 0;
+		if (nodes[num2] != NULL) {
+			delete nodes[num2];
+			nodes[num2] = NULL;
+		}
+//	}
+}		
 
-    for (const auto& kv : inner) {
-      ns3::dvhop::BeaconInfo info = kv.second;
-
-      double x2 = info.GetPosition().first;
-      double y2 = info.GetPosition().second;
-
-      sum += sqrt((x1 - x2) * (x1 - x2) + (y1 - y2) * (y1 - y2));
-      hops += info.GetHops();
-    }
-
-    Ipv4Address ipv4 = (dvhop -> GetIpv4() -> GetAddress(0, 0)).GetAddress();
-
-    if (hops == 0) {
-      hopsize[ipv4] = 0;
-    } else {
-      hopsize[ipv4] = sum / hops;
-    }
-  }
-
-  // Each node now tries to trilateral
-  for (i = beacons; i < size; i++) {
-    Ptr<Ipv4RoutingProtocol> proto = nodes.Get(i) -> GetObject<Ipv4>() -> GetRoutingProtocol ();
-    Ptr<dvhop::RoutingProtocol> dvhop = DynamicCast<dvhop::RoutingProtocol> (proto);
-    ns3::dvhop::DistanceTable table = dvhop -> GetDistanceTable();
-    std::map<Ipv4Address, ns3::dvhop::BeaconInfo> inner = table.Inner();
-
-    // We can't trilaterate with less than 3 nodes
-    if (inner.size() >= 3) {
-      auto a = inner.begin();
-      double xa = a->second.GetPosition().first;
-      double ya = a->second.GetPosition().second;
-
-      // hops size * hops to node
-      double ra = hopsize[a -> first] * a->second.GetHops();
-
-      auto b = inner.begin();
-      double xb = b->second.GetPosition().first;
-      double yb = b->second.GetPosition().second;
-
-      // hops size * hops to node
-      double rb = hopsize[b -> first] * b->second.GetHops();
-
-      auto c = inner.begin();
-      double xc = b->second.GetPosition().first;
-      double yc = b->second.GetPosition().second;
-
-      // hops size * hops to node
-      double rc = hopsize[a -> first] * a->second.GetHops();
-
-      double S = (xc * xc - xb * xb + yc * yc - yb * yb + rb * rb + rc * rc) / 2.0;
-      double T = (xa * xa - xb * xb + ya * ya - yb * yb + rb * rb - ra * ra) / 2.0;
-
-      double y = ((T * (xb - xc)) - (S * (xb - xa))) / (((ya - yb) * (xb - xc)) - ((yc - yb) * (xb - xa)));
-      double x = ((y * (ya - yb)) - T) / (xb - xa);
-
-      std::cout << x << "," << y << "|" << dvhop -> GetXPosition() << "," << dvhop -> GetYPosition();      
-    }
-  }
-}

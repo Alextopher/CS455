@@ -46,6 +46,8 @@ namespace ns3
     public:
       DistanceTable();
 
+      std::map<Ipv4Address, BeaconInfo>  Inner();
+
       /**
        * @brief GetSize The number of entries stored in this table
        * @return The size
