@@ -5,7 +5,7 @@
 Step by step here is how this project should be ran.
 
 1. install NS3 (our program is tested using version 3.35)
-2. Clone the repo within `ns-allinone-3.35/ns-3.35/src/`
+2. Clone the repo within `ns-allinone-3.35/ns-3.35/src/`. You may also download and extract the zip folder instead of using `git`
 3. **rename the cloned directory** to `dvhop`
 4. cd back to `ns-allinone-3.35/ns-3.35/`
 5. run `./waf --run src/dvhop/examples/dvhop-example` (and wait)
