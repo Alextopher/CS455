@@ -72,6 +72,7 @@ private:
   /// Number of nodes
   uint32_t size;
   /// How many nodes are beacons (must be less than size)
+  uint32_t beacons;
   /// Simulation time, seconds
   double totalTime;
   /// Write per-device PCAP traces if true
@@ -97,8 +98,6 @@ private:
   void DV();
 };
 
-const uint32_t beacons = 10;
-
 int main (int argc, char **argv)
 {
   DVHopExample test;
@@ -113,8 +112,9 @@ int main (int argc, char **argv)
 //-----------------------------------------------------------------------------
 DVHopExample::DVHopExample () :
   size (20),
+  beacons(10),
   totalTime (10),
-  pcap (true),
+  pcap (false),
   printRoutes (false)
 {
 }
