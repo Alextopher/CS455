@@ -14,6 +14,41 @@
 
 using namespace ns3;
 
+
+struct point 
+{
+    double x,y;
+};
+
+float norm (point p) // get the norm of a vector
+{
+    return pow(pow(p.x,2)+pow(p.y,2),.5);
+}
+
+point trilateration(point point1, point point2, point point3, double r1, double r2, double r3) {
+    point resultPose;
+    //unit vector in a direction from point1 to point 2
+    double p2p1Distance = pow(pow(point2.x-point1.x,2) + pow(point2.y - point1.y,2),0.5);
+    point ex = {(point2.x-point1.x)/p2p1Distance, (point2.y-point1.y)/p2p1Distance};
+    point aux = {point3.x-point1.x,point3.y-point1.y};
+    //signed magnitude of the x component
+    double i = ex.x * aux.x + ex.y * aux.y;
+    //the unit vector in the y direction. 
+    point aux2 = { point3.x-point1.x-i*ex.x, point3.y-point1.y-i*ex.y};
+    point ey = { aux2.x / norm (aux2), aux2.y / norm (aux2) };
+    //the signed magnitude of the y component
+    double j = ey.x * aux.x + ey.y * aux.y;
+    //coordinates
+    double x = (pow(r1,2) - pow(r2,2) + pow(p2p1Distance,2))/ (2 * p2p1Distance);
+    double y = (pow(r1,2) - pow(r3,2) + pow(i,2) + pow(j,2))/(2*j) - i*x/j;
+    //result coordinates
+    double finalX = point1.x+ x*ex.x + y*ey.x;
+    double finalY = point1.y+ x*ex.y + y*ey.y;
+    resultPose.x = finalX;
+    resultPose.y = finalY;
+    return resultPose;
+}
+
 /**
  * \brief Test script.
  *
@@ -62,7 +97,7 @@ private:
   void DV();
 };
 
-const uint32_t beacons = 20;
+const uint32_t beacons = 10;
 
 int main (int argc, char **argv)
 {
@@ -77,8 +112,8 @@ int main (int argc, char **argv)
 
 //-----------------------------------------------------------------------------
 DVHopExample::DVHopExample () :
-  size (50),
-  totalTime (50),
+  size (20),
+  totalTime (10),
   pcap (true),
   printRoutes (false)
 {
@@ -117,17 +152,6 @@ DVHopExample::Run ()
 
   AnimationInterface anim("animation.xml");
 
-  Simulator::Schedule (Seconds(5), &DVHopExample::Kill);
-  Simulator::Schedule (Seconds(10), &DVHopExample::Kill);
-  Simulator::Schedule (Seconds(15), &DVHopExample::Kill);
-  Simulator::Schedule (Seconds(20), &DVHopExample::Kill);
-  Simulator::Schedule (Seconds(25), &DVHopExample::Kill);
-  Simulator::Schedule (Seconds(30), &DVHopExample::Kill);
-  Simulator::Schedule (Seconds(35), &DVHopExample::Kill);
-  Simulator::Schedule (Seconds(40), &DVHopExample::Kill);
-  Simulator::Schedule (Seconds(45), &DVHopExample::Kill);
-  Simulator::Schedule (Seconds(50), &DVHopExample::Kill);
-
   Simulator::Run ();
   DV();
   Simulator::Destroy ();
@@ -148,8 +172,8 @@ DVHopExample::Kill() {
   Ptr<dvhop::RoutingProtocol> dvhop = DynamicCast<dvhop::RoutingProtocol> (proto);
   dvhop -> Kill();
 
-  Ptr<Ipv4RoutingProtocol> proto = nodes.Get(r2) -> GetObject<Ipv4>() -> GetRoutingProtocol ();
-  Ptr<dvhop::RoutingProtocol> dvhop = DynamicCast<dvhop::RoutingProtocol> (proto);
+  proto = nodes.Get(r2) -> GetObject<Ipv4>() -> GetRoutingProtocol ();
+  dvhop = DynamicCast<dvhop::RoutingProtocol> (proto);
   dvhop -> Kill();
 }
 
@@ -175,9 +199,9 @@ DVHopExample::CreateNodes ()
   
   // x,y values
   Ptr<UniformRandomVariable> xs = CreateObject<UniformRandomVariable> ();
-  xs->SetAttribute ("Max", DoubleValue (400));
+  xs->SetAttribute ("Max", DoubleValue (100));
   Ptr<UniformRandomVariable> ys = CreateObject<UniformRandomVariable> ();
-  ys->SetAttribute ("Max", DoubleValue (400));
+  ys->SetAttribute ("Max", DoubleValue (100));
   
   Ptr<ns3::RandomRectanglePositionAllocator> allocator = CreateObject<ns3::RandomRectanglePositionAllocator> ();
   allocator -> SetX(xs);
@@ -286,7 +310,7 @@ void DVHopExample::DV () {
       hops += info.GetHops();
     }
 
-    Ipv4Address ipv4 = (dvhop -> GetIpv4() -> GetAddress(0, 0)).GetAddress();
+    Ipv4Address ipv4 = (dvhop -> GetIpv4() -> GetAddress(1, 0)).GetAddress();
 
     if (hops == 0) {
       hopsize[ipv4] = 0;
@@ -296,42 +320,56 @@ void DVHopExample::DV () {
   }
 
   // Each node now tries to trilateral
+  double error = 0;
+  int count = 0;
+
   for (i = beacons; i < size; i++) {
-    Ptr<Ipv4RoutingProtocol> proto = nodes.Get(i) -> GetObject<Ipv4>() -> GetRoutingProtocol ();
+    auto node = nodes.Get(i);
+    Ptr<Ipv4RoutingProtocol> proto = node -> GetObject<Ipv4>() -> GetRoutingProtocol ();
     Ptr<dvhop::RoutingProtocol> dvhop = DynamicCast<dvhop::RoutingProtocol> (proto);
     ns3::dvhop::DistanceTable table = dvhop -> GetDistanceTable();
     std::map<Ipv4Address, ns3::dvhop::BeaconInfo> inner = table.Inner();
 
     // We can't trilaterate with less than 3 nodes
     if (inner.size() >= 3) {
-      auto a = inner.begin();
-      double xa = a->second.GetPosition().first;
-      double ya = a->second.GetPosition().second;
+      auto itr = inner.begin();
+
+      double xa = itr->second.GetPosition().first;
+      double ya = itr->second.GetPosition().second;
 
       // hops size * hops to node
-      double ra = hopsize[a -> first] * a->second.GetHops();
+      double ra = hopsize[itr -> first] * itr->second.GetHops();
 
-      auto b = inner.begin();
-      double xb = b->second.GetPosition().first;
-      double yb = b->second.GetPosition().second;
+      itr++;
 
-      // hops size * hops to node
-      double rb = hopsize[b -> first] * b->second.GetHops();
-
-      auto c = inner.begin();
-      double xc = b->second.GetPosition().first;
-      double yc = b->second.GetPosition().second;
+      double xb = itr->second.GetPosition().first;
+      double yb = itr->second.GetPosition().second;
 
       // hops size * hops to node
-      double rc = hopsize[a -> first] * a->second.GetHops();
+      double rb = hopsize[itr -> first] * itr->second.GetHops();
 
-      double S = (xc * xc - xb * xb + yc * yc - yb * yb + rb * rb + rc * rc) / 2.0;
-      double T = (xa * xa - xb * xb + ya * ya - yb * yb + rb * rb - ra * ra) / 2.0;
+      itr++;
+      
+      double xc = itr->second.GetPosition().first;
+      double yc = itr->second.GetPosition().second;
 
-      double y = ((T * (xb - xc)) - (S * (xb - xa))) / (((ya - yb) * (xb - xc)) - ((yc - yb) * (xb - xa)));
-      double x = ((y * (ya - yb)) - T) / (xb - xa);
+      // hops size * hops to node
+      double rc = hopsize[itr -> first] * itr->second.GetHops();
 
-      std::cout << x << "," << y << "|" << dvhop -> GetXPosition() << "," << dvhop -> GetYPosition();      
+      point pa = {xa, ya};
+      point pb = {xb, yb};
+      point pc = {xc, yc};
+      point final = trilateration(pa, pb, pc, ra, rb, rc);
+
+      Vector position = node -> GetObject<MobilityModel> () -> GetPosition();
+
+      // Add distance to the error
+      error += sqrt((final.x - position.x) * (final.x - position.x) + (final.y - position.y) * (final.y - position.y));
+      count++;
+  
+      std::cout << final.x << "," << final.y << " | " << position.x << "," << position.y << std::endl;       
     }
   }
+
+  std::cout << error << " | " << count << std::endl;
 }
